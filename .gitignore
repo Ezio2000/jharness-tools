@@ -1,0 +1,35 @@
+# OS/editor noise
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# Local assistant state
+.codex/
+.claude/
+.gemini/
+.aider*
+
+# Python
+__pycache__/
+*.py[cod]
+.python-version
+.venv/
+venv/
+ENV/
+
+# Tooling caches and reports
+.pytest_cache/
+.ruff_cache/
+.pyright/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Packaging
+dist/
+build/
+*.egg-info/
+
+# Logs
+*.log

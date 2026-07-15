@@ -1,0 +1,73 @@
+[project]
+name = "jharness-tools"
+version = "0.1.0"
+description = "Ready-to-use general-purpose tools for JHarness agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "JHarness contributors" }]
+keywords = ["ai", "agent", "presets", "tools"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: OS Independent",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Typing :: Typed",
+]
+dependencies = []
+
+[project.urls]
+Documentation = "https://github.com/Ezio2000/jharness-tools#readme"
+Homepage = "https://github.com/Ezio2000/jharness-tools"
+Issues = "https://github.com/Ezio2000/jharness-tools/issues"
+Repository = "https://github.com/Ezio2000/jharness-tools.git"
+
+[dependency-groups]
+dev = [
+  "pyright>=1.1.407",
+  "pytest>=8.4.0",
+  "pytest-cov>=6.0.0",
+  "ruff>=0.15.21",
+  "twine>=6.2.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/jharness"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C90", "A", "PERF", "RUF"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.coverage.run]
+branch = true
+source = ["jharness.tools"]
+
+[tool.coverage.report]
+fail_under = 100
+precision = 1
+show_missing = true
+skip_covered = true
+
+[tool.pyright]
+include = ["src", "tests"]
+pythonVersion = "3.11"
+typeCheckingMode = "strict"
