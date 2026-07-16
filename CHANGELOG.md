@@ -29,6 +29,31 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Added raw-byte SHA-256 results to both the structured and model-visible `Read` output,
   allowing models to pass explicit state into `Edit` and conditional `Write` without
   hidden Host memory.
+- Added the serial `BashTool` preset with Host-bounded command length, duration, stdout,
+  and stderr; structured exit observations; stable timeout, cancellation, spawn, and
+  working-directory failures; and conservative subprocess, network, filesystem, and
+  approval risk facts.
+- Added non-interactive Bash process execution with independent pipe draining and
+  truncation accounting, Host-controlled environment selection, workspace-rooted
+  initial directories, bounded cleanup waits, and process-group or Windows Job/fallback
+  termination for managed descendants.
+- Added the durable `AskQuestionTool` preset with Host-selectable confirm, choice, text,
+  number, date, scale, and ranking interactions; stable request identifiers; strict
+  semantic validation; and no filesystem, network, subprocess, or approval effects.
+- Added immutable question request/response values plus validated answer rendering and
+  exact checkpoint-resume helpers, including explicit answered and cancelled outcomes.
+- Added the Host-mediated `Agent`, `AgentGet`, `AgentWait`, and `AgentCancel` presets
+  with strict bounded contracts, foreground durable waits, background acceptance,
+  non-blocking snapshots, acknowledged cancellation, and stable task references.
+- Added immutable Agent request/snapshot values, the narrow `AgentBackend` execution
+  port, and strict checkpoint extraction plus canonical parent-resume helpers. Child
+  Runtime inheritance, storage, supervision, authorization, and cancellation remain
+  explicitly Host-owned.
+
+### Fixed
+
+- Corrected Darwin opened-path validation to use the 1,024-byte buffer accepted by
+  CPython's `fcntl` interface and the platform `F_GETPATH` contract.
 
 ## [0.1.0] - 2026-07-16
 

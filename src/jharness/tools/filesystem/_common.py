@@ -18,7 +18,7 @@ from os import PathLike
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from threading import Event
 from time import monotonic
-from typing import TypeAlias, TypeVar, cast
+from typing import Any, TypeAlias, TypeVar, cast
 
 from jharness.kernel import ContentPart, SettledResult, ToolFailure, ToolResult, ToolSuccess
 
@@ -296,17 +296,34 @@ def _open_readonly(path: Path) -> int:
     return os.open(path, flags)
 
 
+def windows_kernel32() -> Any:  # pragma: no cover - Windows only
+    return ctypes.WinDLL("kernel32", use_last_error=True)  # type: ignore[attr-defined, no-any-return]
+
+
+def _windows_last_error() -> int:  # pragma: no cover - Windows only
+    return ctypes.get_last_error()  # type: ignore[attr-defined, no-any-return]
+
+
+def _windows_set_last_error(value: int) -> None:  # pragma: no cover - Windows only
+    ctypes.set_last_error(value)  # type: ignore[attr-defined]
+
+
+def windows_error(value: int | None = None) -> OSError:  # pragma: no cover - Windows only
+    code = _windows_last_error() if value is None else value
+    return ctypes.WinError(code)  # type: ignore[attr-defined, no-any-return]
+
+
 def _windows_opened_file_path(descriptor: int) -> Path:  # pragma: no cover
     import msvcrt
 
-    handle = msvcrt.get_osfhandle(descriptor)
+    handle = cast(int, msvcrt.get_osfhandle(descriptor))  # type: ignore[attr-defined]
     return windows_final_path(handle)
 
 
 def windows_final_path(handle: int) -> Path:  # pragma: no cover
     from ctypes import wintypes
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = windows_kernel32()
     get_final_path = kernel32.GetFinalPathNameByHandleW
     get_final_path.argtypes = (
         wintypes.HANDLE,
@@ -317,11 +334,11 @@ def windows_final_path(handle: int) -> Path:  # pragma: no cover
     get_final_path.restype = wintypes.DWORD
     required = get_final_path(handle, None, 0, 0)
     if required == 0:
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise windows_error()
     buffer = ctypes.create_unicode_buffer(required + 1)
     written = get_final_path(handle, buffer, len(buffer), 0)
     if written == 0 or written >= len(buffer):
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise windows_error()
     value = buffer.value
     if value.startswith("\\\\?\\UNC\\"):
         value = "\\\\" + value[8:]
@@ -382,7 +399,7 @@ def _windows_parse_directory_buffer(
 def _windows_directory_entries(handle: int) -> Iterator[DirectoryEntry]:  # pragma: no cover
     from ctypes import wintypes
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = windows_kernel32()
     get_information = kernel32.GetFileInformationByHandleEx
     get_information.argtypes = (
         wintypes.HANDLE,
@@ -394,17 +411,17 @@ def _windows_directory_entries(handle: int) -> Iterator[DirectoryEntry]:  # prag
     buffer = ctypes.create_string_buffer(64 * 1024)
     information_class = 11
     while True:
-        ctypes.set_last_error(0)
+        _windows_set_last_error(0)
         if not get_information(
             handle,
             information_class,
             ctypes.byref(buffer),
             ctypes.sizeof(buffer),
         ):
-            error = ctypes.get_last_error()
+            error = _windows_last_error()
             if error == 18:
                 return
-            raise ctypes.WinError(error)
+            raise windows_error(error)
         yield from _windows_parse_directory_buffer(buffer)
         information_class = 10
 
@@ -419,7 +436,7 @@ def _windows_secure_scandir(
     class FileAttributeTagInfo(ctypes.Structure):
         _fields_ = [("attributes", wintypes.DWORD), ("reparse_tag", wintypes.DWORD)]
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = windows_kernel32()
     create_file = kernel32.CreateFileW
     create_file.argtypes = (
         wintypes.LPCWSTR,
@@ -445,7 +462,7 @@ def _windows_secure_scandir(
     )
     invalid_handle = ctypes.c_void_p(-1).value
     if raw_handle is None or raw_handle == invalid_handle:
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise windows_error()
     handle = int(raw_handle)
     try:
         get_information = kernel32.GetFileInformationByHandleEx
@@ -463,14 +480,14 @@ def _windows_secure_scandir(
             ctypes.byref(information),
             ctypes.sizeof(information),
         ):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise windows_error()
         if information.attributes & 0x0400:
             raise OSError(errno.ELOOP, "refusing to traverse a reparse-point directory")
         _validate_opened_path(workspace, directory, windows_final_path(handle))
         yield _windows_directory_entries(handle)
     finally:
         if not close_handle(handle):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise windows_error()
 
 
 def _darwin_opened_file_path(descriptor: int) -> Path:  # pragma: no cover
@@ -479,7 +496,10 @@ def _darwin_opened_file_path(descriptor: int) -> Path:  # pragma: no cover
         Callable[[int, int, bytes], bytes | int],
         fcntl_module.fcntl,
     )
-    value = fcntl_call(descriptor, 50, b"\x00" * 4096)
+    # CPython copies ``fcntl`` byte arguments through a fixed 1024-byte buffer.
+    # Darwin's F_GETPATH uses MAXPATHLEN (also 1024), so a larger argument is
+    # rejected before the system call is made.
+    value = fcntl_call(descriptor, 50, b"\x00" * 1024)
     if not isinstance(value, bytes):
         raise OSError(errno.ENOTSUP, "F_GETPATH did not return a path")
     return Path(value.split(b"\x00", 1)[0].decode())
