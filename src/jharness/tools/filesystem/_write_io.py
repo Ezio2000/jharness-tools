@@ -23,7 +23,9 @@ from jharness.tools.filesystem._common import (
     Workspace,
     check_cancelled,
     opened_file_path,
+    windows_error,
     windows_final_path,
+    windows_kernel32,
 )
 from jharness.tools.filesystem._content import digest_bytes
 
@@ -531,7 +533,7 @@ def _windows_open_directory(path: Path) -> int:  # pragma: no cover - Windows on
     class FileAttributeTagInfo(ctypes.Structure):
         _fields_ = [("attributes", wintypes.DWORD), ("reparse_tag", wintypes.DWORD)]
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = windows_kernel32()
     create_file = kernel32.CreateFileW
     create_file.argtypes = (
         wintypes.LPCWSTR,
@@ -554,7 +556,7 @@ def _windows_open_directory(path: Path) -> int:  # pragma: no cover - Windows on
     )
     invalid_handle = ctypes.c_void_p(-1).value
     if raw_handle is None or raw_handle == invalid_handle:
-        raise ctypes.WinError(ctypes.get_last_error())
+        raise windows_error()
     handle = int(raw_handle)
     try:
         get_information = kernel32.GetFileInformationByHandleEx
@@ -572,7 +574,7 @@ def _windows_open_directory(path: Path) -> int:  # pragma: no cover - Windows on
             ctypes.byref(information),
             ctypes.sizeof(information),
         ):
-            raise ctypes.WinError(ctypes.get_last_error())
+            raise windows_error()
         if not information.attributes & 0x0010:
             raise OSError(errno.ENOTDIR, "opened parent is not a directory")
         if information.attributes & 0x0400:
@@ -595,7 +597,7 @@ def _opened_file_path_from_windows_handle(  # pragma: no cover - Windows only
 def _windows_close_handle(handle: int) -> None:  # pragma: no cover - Windows only
     from ctypes import wintypes
 
-    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32 = windows_kernel32()
     close_handle = kernel32.CloseHandle
     close_handle.argtypes = (wintypes.HANDLE,)
     close_handle.restype = wintypes.BOOL

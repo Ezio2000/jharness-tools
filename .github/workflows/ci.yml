@@ -64,7 +64,7 @@ jobs:
           test ! -e src/jharness/__init__.py
           wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
           uv run --isolated --with "$wheel" python -I -c \
-            "from pathlib import Path; from jharness.tools import EditTool, GlobTool, GrepTool, ReadTool, WriteTool; root = Path.cwd(); assert [tool.spec.name for tool in (ReadTool(root), GlobTool(root), GrepTool(root), EditTool(root), WriteTool(root))] == ['Read', 'Glob', 'Grep', 'Edit', 'Write']"
+            "from pathlib import Path; from jharness.tools import AgentCancelTool, AgentGetTool, AgentTool, AgentWaitTool, AskQuestionTool, BashTool, EditTool, GlobTool, GrepTool, ReadTool, WriteTool; from jharness.tools.agent import AgentBackend, AgentBackendError, AgentRequest, AgentSnapshot, AgentStatus, AgentWaitRequest, agent_completion_message, extract_agent_wait, resume_agent; from jharness.tools.interaction import QuestionRequest, QuestionResponse, extract_question_request, question_response_message, resume_question, validate_question_response; root = Path.cwd(); assert [tool.spec.name for tool in (ReadTool(root), GlobTool(root), GrepTool(root), EditTool(root), WriteTool(root), BashTool(root), AskQuestionTool())] == ['Read', 'Glob', 'Grep', 'Edit', 'Write', 'Bash', 'AskQuestion']; assert [AgentTool.__name__, AgentGetTool.__name__, AgentWaitTool.__name__, AgentCancelTool.__name__] == ['AgentTool', 'AgentGetTool', 'AgentWaitTool', 'AgentCancelTool']"
 
   runtime:
     name: Python ${{ matrix.python-version }} (${{ matrix.os }})
@@ -96,6 +96,9 @@ jobs:
 
       - name: Install locked dependencies
         run: uv sync --locked
+
+      - name: Verify Bash test prerequisite
+        run: uv run python -c "import shutil; assert shutil.which('bash') is not None"
 
       - name: Test
         run: uv run pytest -c pyproject.toml -q -p no:cacheprovider

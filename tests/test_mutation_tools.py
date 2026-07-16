@@ -6,7 +6,8 @@ import errno
 import hashlib
 import os
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Generator, Mapping
+from contextlib import contextmanager
 from pathlib import Path
 from threading import Event
 from typing import Any, cast
@@ -31,6 +32,15 @@ from jharness.tools.filesystem._common import FilesystemFailure, OperationCancel
 
 async def _emit_progress(_progress: Mapping[str, Any]) -> None:
     return None
+
+
+@contextmanager
+def _path_based_parent(
+    _target: _write_io.MutationTarget,
+) -> Generator[None, None, None]:
+    """Exercise the path-based fallback used when directory handles are unavailable."""
+
+    yield None
 
 
 def _invoke(
@@ -271,6 +281,42 @@ def test_write_overwrites_only_the_expected_snapshot(tmp_path: Path) -> None:
         "bytes_written": len(encoded),
     }
     assert path.read_bytes() == encoded
+    assert _temp_files(tmp_path) == []
+
+
+def test_path_based_parent_fallback_creates_and_replaces_atomically(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
+    tool = WriteTool(tmp_path)
+
+    _, created = _success(
+        _invoke(
+            tool,
+            {"file_path": "fallback.txt", "content": "created", "expected_sha256": None},
+        )
+    )
+    created_raw = b"created"
+    assert created["operation"] == "created"
+    assert created["sha256"] == _digest(created_raw)
+    assert (tmp_path / "fallback.txt").read_bytes() == created_raw
+
+    _, overwritten = _success(
+        _invoke(
+            tool,
+            {
+                "file_path": "fallback.txt",
+                "content": "replaced",
+                "expected_sha256": _digest(created_raw),
+            },
+        )
+    )
+    replaced_raw = b"replaced"
+    assert overwritten["operation"] == "overwritten"
+    assert overwritten["previous_sha256"] == _digest(created_raw)
+    assert overwritten["sha256"] == _digest(replaced_raw)
+    assert (tmp_path / "fallback.txt").read_bytes() == replaced_raw
     assert _temp_files(tmp_path) == []
 
 
@@ -897,6 +943,28 @@ def test_parent_os_errors_have_stable_failure_codes(
     assert failure.code == code
 
 
+def test_resolve_mutation_target_rejects_a_drive_relative_windows_path(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class DriveRelativePath:
+        drive = "C:"
+
+        def expanduser(self) -> DriveRelativePath:
+            return self
+
+        def is_absolute(self) -> bool:
+            return False
+
+    def drive_relative_path(_value: object) -> DriveRelativePath:
+        return DriveRelativePath()
+
+    monkeypatch.setattr(_write_io, "Path", drive_relative_path)
+    with pytest.raises(FilesystemFailure) as captured:
+        _write_io.resolve_mutation_target(Workspace.create(tmp_path), "C:relative.txt")
+    assert captured.value.code == "path_outside_workspace"
+
+
 def test_edit_rejects_a_non_regular_opened_target(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -937,6 +1005,7 @@ def test_mutation_rejects_a_reparse_target_without_following_it(
         return True
 
     monkeypatch.setattr(_write_io, "_is_reparse", always_reparse)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
 
     _failure(
         _invoke(
@@ -973,6 +1042,7 @@ def test_edit_detects_target_identity_change_during_open(
         return next(identities)
 
     monkeypatch.setattr(_write_io, "_identity", next_identity)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
 
     _failure(
         _invoke(
@@ -1007,6 +1077,7 @@ def test_edit_normalizes_existing_target_open_errors(
         raise OSError(error_number, "denied")
 
     monkeypatch.setattr(_write_io.os, "open", fail_open)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
     _failure(
         _invoke(
             EditTool(tmp_path),
@@ -1034,6 +1105,7 @@ def test_edit_rejects_opened_handle_outside_workspace(
         return tmp_path.parent / "outside.txt"
 
     monkeypatch.setattr(_write_io, "opened_file_path", outside_path)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
 
     _failure(
         _invoke(
@@ -1062,6 +1134,7 @@ def test_temporary_name_collision_exhaustion_is_a_stable_failure(
         raise FileExistsError
 
     monkeypatch.setattr(_write_io.os, "open", collide)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
     _failure(
         _invoke(
             WriteTool(tmp_path),
@@ -1101,6 +1174,7 @@ def test_temporary_handle_escape_is_removed(
         return tmp_path.parent / "escaped.tmp"
 
     monkeypatch.setattr(_write_io, "opened_file_path", escaped_path)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
     _failure(
         _invoke(
             WriteTool(tmp_path),
@@ -1163,6 +1237,7 @@ def test_disappearing_temporary_is_rejected_without_residue(
         return original_lstat(path)
 
     monkeypatch.setattr(Path, "lstat", disappear)
+    monkeypatch.setattr(_write_io, "_open_parent", _path_based_parent)
     _failure(
         _invoke(
             WriteTool(tmp_path),

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import asyncio
+import os
+import sys
 import time
 from collections.abc import Callable, Mapping
 from hashlib import sha256
@@ -78,7 +80,19 @@ def _failure(outcome: ToolSuccess | ToolFailure, code: str) -> str:
 
 
 def test_public_api_and_contracts(tmp_path: Path) -> None:
-    assert tools.__all__ == ["EditTool", "GlobTool", "GrepTool", "ReadTool", "WriteTool"]
+    assert tools.__all__ == [
+        "AgentCancelTool",
+        "AgentGetTool",
+        "AgentTool",
+        "AgentWaitTool",
+        "AskQuestionTool",
+        "BashTool",
+        "EditTool",
+        "GlobTool",
+        "GrepTool",
+        "ReadTool",
+        "WriteTool",
+    ]
     read_presets = (tools.ReadTool(tmp_path), tools.GlobTool(tmp_path), tools.GrepTool(tmp_path))
     write_presets = (tools.EditTool(tmp_path), tools.WriteTool(tmp_path))
     presets = (*read_presets, *write_presets)
@@ -265,6 +279,20 @@ def test_workspace_boundaries_and_helpers(tmp_path: Path, monkeypatch: pytest.Mo
     assert not is_in_excluded_directory("src/.git", names, is_file=True)
     with pytest.raises(ValueError, match="individual path names"):
         excluded_names(("..",))
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="F_GETPATH is a Darwin API")
+def test_darwin_opened_paths_fit_the_fcntl_buffer(tmp_path: Path) -> None:
+    source = tmp_path / "source.txt"
+    source.write_text("content", encoding="utf-8")
+    file_descriptor = os.open(source, os.O_RDONLY)
+    directory_descriptor = os.open(tmp_path, os.O_RDONLY)
+    try:
+        assert _common.opened_file_path(file_descriptor) == source.resolve()
+        assert _common.opened_file_path(directory_descriptor) == tmp_path.resolve()
+    finally:
+        os.close(file_descriptor)
+        os.close(directory_descriptor)
 
 
 @pytest.mark.parametrize("pattern", ["../*.py", "", "bad\x00pattern", "src\\*.py"])
