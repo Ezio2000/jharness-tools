@@ -20,7 +20,10 @@ classifiers = [
   "Programming Language :: Python :: 3.14",
   "Typing :: Typed",
 ]
-dependencies = []
+dependencies = [
+  "jharness-kernel>=0.1.2,<0.2.0",
+  "regex>=2024.11.6",
+]
 
 [project.urls]
 Documentation = "https://github.com/Ezio2000/jharness-tools#readme"
@@ -30,6 +33,7 @@ Repository = "https://github.com/Ezio2000/jharness-tools.git"
 
 [dependency-groups]
 dev = [
+  "jharness-toolkit>=0.1.2,<0.2.0",
   "pyright>=1.1.407",
   "pytest>=8.4.0",
   "pytest-cov>=6.0.0",

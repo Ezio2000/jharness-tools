@@ -7,6 +7,29 @@ versions follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- Added explicit `ReadTool`, `GlobTool`, and `GrepTool` presets with workspace
+  containment, deterministic bounded results, cooperative cancellation, and stable
+  model-visible failures.
+- Added strict UTF-8 text handling, shared search exclusions, structured results, and
+  parallel-safe execution and filesystem risk declarations.
+- Added opened-handle workspace revalidation, bounded file and line output, and
+  time-limited regular-expression evaluation.
+- Added no-follow directory traversal, iterative and complexity-bounded glob matching,
+  and Host-configured search time, entry, and byte budgets.
+- Added direct runtime dependencies on `jharness-kernel` contracts and the `regex`
+  engine; `jharness-toolkit` remains development-only.
+- Added explicit `EditTool` and `WriteTool` presets with required SHA-256 compare-and-set
+  inputs, serial mutation facts, conservative approval risk declarations, and bounded
+  structured receipts.
+- Added per-target mutation coordination, no-follow parent traversal, same-directory
+  staged writes, atomic no-clobber creation, optimistic atomic replacement, cooperative
+  pre-commit cancellation, and stable mutation failures.
+- Added raw-byte SHA-256 results to both the structured and model-visible `Read` output,
+  allowing models to pass explicit state into `Edit` and conditional `Write` without
+  hidden Host memory.
+
 ## [0.1.0] - 2026-07-16
 
 ### Added

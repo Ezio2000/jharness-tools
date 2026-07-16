@@ -64,7 +64,7 @@ jobs:
           test ! -e src/jharness/__init__.py
           wheel="$(find dist -maxdepth 1 -name '*.whl' -print -quit)"
           uv run --isolated --with "$wheel" python -I -c \
-            "import jharness.tools; assert jharness.tools.__all__ == []"
+            "from pathlib import Path; from jharness.tools import EditTool, GlobTool, GrepTool, ReadTool, WriteTool; root = Path.cwd(); assert [tool.spec.name for tool in (ReadTool(root), GlobTool(root), GrepTool(root), EditTool(root), WriteTool(root))] == ['Read', 'Glob', 'Grep', 'Edit', 'Write']"
 
   runtime:
     name: Python ${{ matrix.python-version }} (${{ matrix.os }})
@@ -75,6 +75,9 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
         python-version: ["3.11", "3.12", "3.13", "3.14"]
+        include:
+          - os: macos-latest
+            python-version: "3.11"
 
     steps:
       - name: Check out repository
